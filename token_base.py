@@ -32,6 +32,6 @@ class FailedTokenizationException(Exception):
 class Tokenizer:
     @abstractmethod
     def tokenize(self, code, keep_format_specifiers=False, keep_names=True, \
-                 keep_literals=False):
+                 keep_literals=False, custom_names = []):
         return NotImplemented
 

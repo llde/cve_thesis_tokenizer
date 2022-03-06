@@ -32,10 +32,9 @@ class C_Tokenizer(Tokenizer):
                  'null', 'struct', 'union']
     _includes = ['stdio.h', 'stdlib.h', 'string.h', 'math.h', 'malloc.h',
                  'stdbool.h', 'cstdio', 'cstdio.h', 'iostream', 'conio.h']
-    _calls = ['printf', 'scanf', 'cin', 'cout', 'clrscr', 'getch', 'strlen',
+    _calls = ['printf', 'scanf', 'printk', 'clrscr', 'getch', 'strlen',
               'gets', 'fgets', 'getchar', 'main', 'malloc', 'calloc', 'free']
     _types = ['char', 'double', 'float', 'int', 'long', 'short', 'unsigned']
-
     def _escape(self, string):
         return repr(string)[1:-1]
 
@@ -44,12 +43,14 @@ class C_Tokenizer(Tokenizer):
         token_specification = [
             ('comment',
              r'\/\*(?:[^*]|\*(?!\/))*\*\/|\/\*([^*]|\*(?!\/))*\*?|\/\/[^\n]*'),
+            ('include',  r'(?<=\#include) *<([_A-Za-z]\w*(?:\.h))?>'),
+
             ('directive', r'#\w+'),
-            ('string', r'"(?:[^"\n]|\\")*"?'),
+     #      ('string', r'"(?:[^"\n]|\\")*"?'),
+            ('string', r'"(?:(?:(?<!\\)|(?<=\\\\))\\"|[^"])*"?'),
             ('char', r"'(?:\\?[^'\n]|\\')'"),
             ('char_continue', r"'[^']*"),
             ('number',  r'[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?'),
-            ('include',  r'(?<=\#include) *<([_A-Za-z]\w*(?:\.h))?>'),
             ('op',
              r'\(|\)|\[|\]|{|}|->|<<|>>|\*\*|\|\||&&|--|\+\+|[-+*|&%\/=]=|[-<>~!%^&*\/+=?|.,:;#]'),
             ('name',  r'[_A-Za-z]\w*'),
@@ -61,15 +62,18 @@ class C_Tokenizer(Tokenizer):
                              pair for pair in token_specification)
         line_num = 1
         line_start = 0
+        mox = ""
         for mo in re.finditer(tok_regex, code):
             kind = mo.lastgroup
             value = mo.group(kind)
+            mox += kind + ":" + value + " "
             if kind == 'NEWLINE':
                 line_start = mo.end()
                 line_num += 1
             elif kind == 'SKIP':
                 pass
             elif kind == 'MISMATCH':
+                print(mox)
                 yield UnexpectedTokenException('%r unexpected on line %d' % (value, line_num))
             else:
                 if kind == 'ID' and value in keywords:
@@ -108,8 +112,80 @@ class C_Tokenizer(Tokenizer):
 
         return recompose_program(lines)
 
-    def tokenize(self, code, keep_format_specifiers=False, keep_names=True,
-                 keep_literals=False):
+    def partial_tokenize(self, code):
+        name_sequence = []
+        headers = []
+        my_gen = self._tokenize_code(code)
+        regex = '%(d|i|f|c|s|u|g|G|e|p|llu|ll|ld|l|o|x|X)'
+        isNewLine = True
+        prev_id = False
+        prev_name = ""
+        directive = False
+        ok = True
+        while True:
+            try:
+                token = next(my_gen)
+            except StopIteration:
+                break
+
+            if isinstance(token, Exception):
+                ok = False
+                print(token)
+                break
+
+            type_ = str(token[0])
+            value = str(token[1])
+            if(prev_id == True):
+                if(type_ == 'op'  and value == '(' and directive == False):
+                    name_sequence.append(prev_name)
+
+            prev_id = False
+            prev_name = ""
+            if value in self._keywords:
+                isNewLine = False
+
+            elif type_ == 'include':
+                headers += value
+                isNewLine = False
+
+            elif value in self._types:
+                isNewLine = False
+
+            elif type_ == 'whitespace' and (('\n' in value) or ('\r' in value)):
+                if isNewLine:
+                    continue
+    #            line_count += 1
+                isNewLine = True
+                directive = False
+
+            elif type_ == 'whitespace' or type_ == 'comment' or type_ == 'nl':
+                pass
+
+            elif 'string' in type_:
+                isNewLine = False
+
+            elif type_ == 'name':
+                isNewLine = False
+                prev_id = True
+                prev_name = value
+
+            elif type_ == 'number':
+                isNewLine = False
+
+            elif 'char' in type_ or value == '':
+                isNewLine = False
+            elif type_ == 'directive':
+                isNewLine = False
+                directive = True
+
+            else:
+                isNewLine = False
+
+        return name_sequence, headers , ok
+
+
+    def tokenize(self, code, keep_format_specifiers=False, keep_names=False,
+                 keep_literals=False, custom_names = []):
         result = '0 ~ '
 
         names = ''
@@ -122,7 +198,9 @@ class C_Tokenizer(Tokenizer):
 
         # Get the iterable
         my_gen = self._tokenize_code(code)
-
+        prev_id = True
+        prev_name = ""
+        directive = False;
         while True:
             try:
                 token = next(my_gen)
@@ -134,7 +212,17 @@ class C_Tokenizer(Tokenizer):
 
             type_ = str(token[0])
             value = str(token[1])
+            if(prev_id == True):
+                if(type_ == 'op'  and value == '(' and directive == False):
+                    if(keep_names == True):
+                        result += '_<id>_' + '_' + prev_name  + '_@ '  #define calls and function style macros call
+                    else:
+                        result += '_<id>_' + '_<func>_@ '  #define calls and function style macros call
+                else:
+                    result += '_<id>_' + '_<var>_@ '  #define vars and macro definitions
 
+            prev_id = False
+            prev_name = ""
             if value in self._keywords:
                 result += '_<keyword>_' + self._escape(value) + ' '
                 isNewLine = False
@@ -158,6 +246,7 @@ class C_Tokenizer(Tokenizer):
                 result += ' '.join(list(str(line_count))) + ' ~ '
                 line_count += 1
                 isNewLine = True
+                directive = False
 
             elif type_ == 'whitespace' or type_ == 'comment' or type_ == 'nl':
                 pass
@@ -173,17 +262,10 @@ class C_Tokenizer(Tokenizer):
                 isNewLine = False
 
             elif type_ == 'name':
-                if keep_names:
-                    if self._escape(value) not in name_dict:
-                        name_dict[self._escape(value)] = str(
-                            len(name_dict) + 1)
-
-                    name_sequence.append(self._escape(value))
-                    result += '_<id>_' + name_dict[self._escape(value)] + '@ '
-                    names += '_<id>_' + name_dict[self._escape(value)] + '@ '
-                else:
-                    result += '_<id>_' + '@ '
+#                result += '_<id>_' + '_<var>_@ '  #define vars and macros definition
                 isNewLine = False
+                prev_id = True
+                prev_name = value
 
             elif type_ == 'number':
                 if keep_literals:
@@ -195,6 +277,10 @@ class C_Tokenizer(Tokenizer):
             elif 'char' in type_ or value == '':
                 result += '_<' + type_.lower() + '>_' + ' '
                 isNewLine = False
+            elif type_ == 'directive':
+                result += '_<' + type_ + '>_'
+                isNewLine = False
+                directive = True
 
             else:
                 converted_value = self._escape(value).replace('~', 'TiLddE')
