@@ -43,8 +43,6 @@ class C_Tokenizer(Tokenizer):
         token_specification = [
             ('comment',
              r'\/\*(?:[^*]|\*(?!\/))*\*\/|\/\*([^*]|\*(?!\/))*\*?|\/\/[^\n]*'),
-            ('include',  r'(?<=\#include) *<([_A-Za-z]\w*(?:\.h))?>'),
-
             ('directive', r'#\w+'),
      #      ('string', r'"(?:[^"\n]|\\")*"?'),
             ('string', r'"(?:(?:(?<!\\)|(?<=\\\\))\\"|[^"])*"?'),
@@ -53,6 +51,7 @@ class C_Tokenizer(Tokenizer):
             ('number',  r'[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?'),
             ('op',
              r'\(|\)|\[|\]|{|}|->|<<|>>|\*\*|\|\||&&|--|\+\+|[-+*|&%\/=]=|[-<>~!%^&*\/+=?|.,:;#]'),
+            ('include',  r'(?<=\#include) *<([_A-Za-z]\w*(?:\.h))?>'),
             ('name',  r'[_A-Za-z]\w*'),
             ('whitespace',  r'\s+'),
             ('nl', r'\\\n?'),
@@ -114,6 +113,7 @@ class C_Tokenizer(Tokenizer):
 
     def partial_tokenize(self, code):
         name_sequence = []
+        func_defs = []
         headers = []
         my_gen = self._tokenize_code(code)
         regex = '%(d|i|f|c|s|u|g|G|e|p|llu|ll|ld|l|o|x|X)'
@@ -122,6 +122,7 @@ class C_Tokenizer(Tokenizer):
         prev_name = ""
         directive = False
         ok = True
+        prevTok = []
         while True:
             try:
                 token = next(my_gen)
@@ -135,12 +136,39 @@ class C_Tokenizer(Tokenizer):
 
             type_ = str(token[0])
             value = str(token[1])
+            definition = False
             if(prev_id == True):
                 if(type_ == 'op'  and value == '(' and directive == False):
-                    name_sequence.append(prev_name)
+                    for tok in reversed(prevTok[:-1]):
+                        if tok[0] == "whitespace": continue
+                        elif tok[0] == "name":
+                            definition = True
+                            break
+                        elif tok[0] == "op":
+                            if tok[1] != "*": break
+                            else: continue
+                    if(definition == True):
+                        func_defs.append(prev_name)
+                        prevTok.clear()
+                    else:
+                        name_sequence.append(prev_name)
+
+            prevTok.append(token)
+
+            if type_ == 'whitespace' and (('\n' in value) or ('\r' in value)):
+                if isNewLine:
+                    continue
+    #            line_count += 1
+                isNewLine = True
+                directive = False
+                continue;
+
+            elif type_ == 'whitespace' or type_ == 'comment' or type_ == 'nl':
+                continue;
 
             prev_id = False
             prev_name = ""
+
             if value in self._keywords:
                 isNewLine = False
 
@@ -150,16 +178,6 @@ class C_Tokenizer(Tokenizer):
 
             elif value in self._types:
                 isNewLine = False
-
-            elif type_ == 'whitespace' and (('\n' in value) or ('\r' in value)):
-                if isNewLine:
-                    continue
-    #            line_count += 1
-                isNewLine = True
-                directive = False
-
-            elif type_ == 'whitespace' or type_ == 'comment' or type_ == 'nl':
-                pass
 
             elif 'string' in type_:
                 isNewLine = False
@@ -181,7 +199,7 @@ class C_Tokenizer(Tokenizer):
             else:
                 isNewLine = False
 
-        return name_sequence, headers , ok
+        return name_sequence, headers, func_defs  , ok
 
 
     def tokenize(self, code, keep_format_specifiers=False, keep_names=False,
@@ -201,6 +219,7 @@ class C_Tokenizer(Tokenizer):
         prev_id = True
         prev_name = ""
         directive = False;
+        prevTok = []
         while True:
             try:
                 token = next(my_gen)
@@ -212,9 +231,21 @@ class C_Tokenizer(Tokenizer):
 
             type_ = str(token[0])
             value = str(token[1])
+            definition = False
             if(prev_id == True):
                 if(type_ == 'op'  and value == '(' and directive == False):
-                    if(keep_names == True):
+                    for tok in reversed(prevTok[:-1]):
+                        if tok[0] == "whitespace": continue
+                        elif tok[0] == "name":
+                            definition = True
+                            break
+                        elif tok[0] == "op":
+                            if tok[1] != "*": break
+                            else: continue
+                    if(definition == True):
+                        result += '_<FuncDef>_' + '_' + prev_name  + '_@ '  #define functions
+                        prevTok.clear()
+                    elif(keep_names == True):
                         result += '_<id>_' + '_' + prev_name  + '_@ '  #define calls and function style macros call
                     else:
                         result += '_<id>_' + '_<func>_@ '  #define calls and function style macros call
@@ -223,6 +254,7 @@ class C_Tokenizer(Tokenizer):
 
             prev_id = False
             prev_name = ""
+            prevTok.append(token)
             if value in self._keywords:
                 result += '_<keyword>_' + self._escape(value) + ' '
                 isNewLine = False
