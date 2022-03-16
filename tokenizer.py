@@ -1,4 +1,3 @@
-
 """
 Copyright 2017 Rahul Gupta, Soham Pal, Aditya Kanade, Shirish Shevade.
 Indian Institute of Science.
@@ -201,8 +200,142 @@ class C_Tokenizer(Tokenizer):
 
         return name_sequence, headers, func_defs  , ok
 
-
     def tokenize(self, code, keep_format_specifiers=False, keep_names=False,
+                 keep_literals=False, custom_names = []):
+        line_count = 1
+        name_sequence = []
+        if(custom_names == []): name_sequence = self._calls
+        else : name_sequence = custom_names
+        token_seq = []
+        regex = '%(d|i|f|c|s|u|g|G|e|p|llu|ll|ld|l|o|x|X)'
+        isNewLine = True
+
+        # Get the iterable
+        my_gen = self._tokenize_code(code)
+        prev_id = True
+        prev_name = ""
+        directive = False;
+        prevTok = []
+        while True:
+            try:
+                token = next(my_gen)
+            except StopIteration:
+                break
+
+            if isinstance(token, Exception):
+                return token_seq
+
+            type_ = str(token[0])
+            value = str(token[1])
+            definition = False
+            if(prev_id == True):
+                if(type_ == 'op'  and value == '(' and directive == False):
+                    for tok in reversed(prevTok[:-1]):
+                        if tok[0] == "whitespace": continue
+                        elif tok[0] == "name":
+                            definition = True
+                            break
+                        elif tok[0] == "op":
+                            if tok[1] != "*": break
+                            else: continue
+                    if(definition == True):
+                        token_seq.append(("FuncDef", prev_name))
+                        prevTok.clear()
+                    elif(keep_names == True):
+                        #define calls and function style macros call
+                        token_seq.append(("id", prev_name))
+                    else:
+                        #define calls and function style macros call
+                        token_seq.append(("id", "func"))
+                else:
+                    #define vars and macro definitions
+                    token_seq.append(("id", "var"))
+
+            prev_id = False
+            prev_name = ""
+            prevTok.append(token)
+            if value in self._keywords:
+                token_seq.append(("keyword", self._escape(value)))
+                isNewLine = False
+
+            elif type_ == 'include':
+                token_seq.append(("include", self._escape(value).lstrip()))
+                isNewLine = False
+
+            elif value in name_sequence:
+                token_seq.append(("APICall", self._escape(value).lstrip()))
+                isNewLine = False
+
+            elif value in self._types:
+                token_seq.append(("type", self._escape(value).lstrip()))
+                isNewLine = False
+
+            elif type_ == 'whitespace' and (('\n' in value) or ('\r' in value)):
+                if isNewLine:
+                    continue
+
+       #         result += ' '.join(list(str(line_count))) + ' ~ '
+                line_count += 1
+                isNewLine = True
+                directive = False
+                token_seq.append(("endline", "-"))
+
+
+            elif type_ == 'whitespace' or type_ == 'comment' or type_ == 'nl':
+                pass
+
+            elif 'string' in type_:
+             #   matchObj = [m.group().strip()
+            #                for m in re.finditer(regex, value)]
+           #     if matchObj and keep_format_specifiers:
+          #          for each in matchObj:
+         #               result += each + ' '
+        #        else:
+       #             result += '_<string>_' + ' '
+                isNewLine = False
+                token_seq.append(("string", "-")) #TODO format string
+
+            elif type_ == 'name':
+                isNewLine = False
+                prev_id = True
+                prev_name = value
+
+            elif type_ == 'number':
+        #        if keep_literals:
+       #             result += '_<number>_' + self._escape(value) + '# '
+      #          else:
+     #               result += '_<number>_' + '# '
+                isNewLine = False
+                token_seq.append(("number", "-"))
+
+            elif 'char' in type_ or value == '':
+         #       result += '_<' + type_.lower() + '>_' + ' '
+                token_seq.append((type_, "-"))
+                isNewLine = False
+            elif type_ == 'directive':
+        #        result += '_<' + type_ + '>_'
+                token_seq.append(("directive", "-"))
+                isNewLine = False
+                directive = True
+
+            else:
+                converted_value = self._escape(value).replace('~', 'TiLddE')
+    #            result += '_<' + type_ + '>_' + converted_value + ' '
+                token_seq.append((type_, converted_value))
+                isNewLine = False
+
+  #      result = result[:-1]
+   #     names = names[:-1]
+
+    #    if result.endswith('~'):
+    #        idx = result.rfind('}')
+    #        result = result[:idx + 1]
+
+        return token_seq
+
+
+
+    def tokenize_tostring(self, code, keep_format_specifiers=False, keep_names=False,
                  keep_literals=False, custom_names = []):
         result = '0 ~ '
 
