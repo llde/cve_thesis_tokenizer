@@ -17,7 +17,7 @@ def pick_progressive(name):
     if name in cache: return cache[name]
     old_idx = idx
     idx+=1
-    if(old_idx > 233): return -1 #No enough token
+    if(old_idx > 231): return -1 #No enough token
     while (idx in exclude): idx+=1
     cache[name] = old_idx
     return old_idx
@@ -45,7 +45,7 @@ def token_to_pixel(token):
         if(tok[1] == "static"): return 237
         if(tok[1] == "extern"): return 236
         if(tok[1] == "do"): return 235
-        if(tok[1] == "&","goto"): return 234
+        if(tok[1] == "goto"): return 234
         if(tok[1] == "null" or tok[1] == "NULL" ): return 3
         if(tok[1] == "offsetof"): return 233
         if(tok[1] == "sizeof"): return 232
