@@ -26,7 +26,7 @@ Token = collections.namedtuple('Token', ['typ', 'value', 'line', 'column'])
 class C_Tokenizer(Tokenizer):
     _keywords = ['auto', 'break', 'case', 'const', 'continue', 'default',
                  'do', 'else', 'enum', 'extern', 'for', 'goto', 'if',
-                 'register', 'return', 'signed', 'sizeof', 'static', 'switch',
+                 'register', 'return', 'signed', 'sizeof', 'offsetof' , 'static', 'switch',
                  'typedef', 'void', 'volatile', 'while', 'EOF', 'NULL',
                  'null', 'struct', 'union']
     _includes = ['stdio.h', 'stdlib.h', 'string.h', 'math.h', 'malloc.h',
