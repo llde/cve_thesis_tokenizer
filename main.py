@@ -11,13 +11,13 @@ def sort(i):
     return i[1]
 
 idx = 4
-exclude = [0,1,2,3,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35, 36, 37,38,40,50,232,233,234,235,236,237,238,239,240,241,42,243,244,245,246,247,248,249,250,251,252,253,254,255]
+exclude = [0,1,2,3,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35, 36, 37,38,40,50, 231,232,233,234,235,236,237,238,239,240,241,42,243,244,245,246,247,248,249,250,251,252,253,254,255]
 cache = {}
 def pick_progressive(name):
     if name in cache: return cache[name]
     old_idx = idx
     idx+=1
-    if(old_idx > 231): return -1 #No enough token
+    if(old_idx > 230): return -1 #No enough token
     while (idx in exclude): idx+=1
     cache[name] = old_idx
     return old_idx
@@ -34,7 +34,7 @@ def token_to_pixel(token):
         if(tok[1] == "case"): return 248
         if(tok[1] == "continue"): return 247
         if(tok[1] == "default"): return 246
-        if(tok[1] == "signed" or tok[1] == "unsigned"): return 245  #Auto is C++
+        if(tok[1] == "signed" or tok[1] == "unsigned"): return 245
         if(tok[1] == "const"): return 244
         if(tok[1] == "enum"): return 243
         if(tok[1] == "struct"): return 242
@@ -49,6 +49,7 @@ def token_to_pixel(token):
         if(tok[1] == "null" or tok[1] == "NULL" ): return 3
         if(tok[1] == "offsetof"): return 233
         if(tok[1] == "sizeof"): return 232
+        if(tok[1] == "auto"): return 231
         if(tok[1] == "register"): return -2 # (-2 ignore and skip token)  register doesn't modify behaviour in modern compilers
         if(tok[1] == "EOF"): return 0
     if(tok[0] == "directive"): return 20
@@ -80,7 +81,7 @@ def token_to_pixel(token):
     if(tok[0] == "FuncDef"): return 35
     if(tok[0] == "APICall"):
         return pick_progressive(tok[1])
-    print(tok[0] + tok[1])
+    print(tok[0] +" " + tok[1])
     return 0
 
 
@@ -88,6 +89,7 @@ if __name__ == "__main__":
     tokenizer = tokenizer.C_Tokenizer()
     name_and_count = dict()
     for folder in os.scandir(path):
+        if(folder.is_dir() == False): continue;
         path_pre = os.path.join(folder.path, "pre");
         path_post = os.path.join(folder.path, "post");
         path_tokpre = os.path.join(folder.path, "tokpre");
@@ -116,6 +118,7 @@ if __name__ == "__main__":
 
     number = 200
     for folder in os.scandir(path):
+        if(folder.is_dir() == False): continue;
         if number == 0: break
         path_pre = os.path.join(folder.path, "pre");
         path_post = os.path.join(folder.path, "post");
@@ -154,7 +157,6 @@ if __name__ == "__main__":
 
             img.save(path_new + ".jpg")
             print(path_new)
-            break
         for file in os.scandir(path_post):
             with open(file.path,'r') as f:
                 content = f.read()
@@ -183,6 +185,5 @@ if __name__ == "__main__":
 
             img.save(path_new + ".jpg")
             print(path_new)
-            break
 
         number -=1
