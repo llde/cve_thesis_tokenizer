@@ -139,13 +139,19 @@ class C_Tokenizer(Tokenizer):
             if(prev_id == True):
                 if(type_ == 'op'  and value == '(' and directive == False):
                     for tok in reversed(prevTok[:-1]):
-                        if tok[0] == "whitespace": continue
-                        elif tok[0] == "name":
+                        if str(tok[0]) == 'whitespace': continue
+                        elif str(tok[0]) == 'name' and not str(tok[1]) == 'return' :
                             definition = True
                             break
-                        elif tok[0] == "op":
-                            if tok[1] != "*": break
+                        elif str(tok[0]) == 'op':
+                            if tok[1] != '*':
+                                definition = False
+                                break
                             else: continue
+                        elif str(tok[0]) == 'name' and str(tok[1]) == 'return':
+                            definition = False
+                            break
+                        
                     if(definition == True):
                         func_defs.append(prev_name)
                         prevTok.clear()
@@ -223,7 +229,7 @@ class C_Tokenizer(Tokenizer):
                 break
 
             if isinstance(token, Exception):
-                return token_seq
+                return token
 
             type_ = str(token[0])
             value = str(token[1])
@@ -238,6 +244,8 @@ class C_Tokenizer(Tokenizer):
                         elif tok[0] == "op":
                             if tok[1] != "*": break
                             else: continue
+                        elif tok[0] == "return":
+                            break
                     if(definition == True):
                         token_seq.append(("FuncDef", prev_name))
                         prevTok.clear()
@@ -274,7 +282,6 @@ class C_Tokenizer(Tokenizer):
                 if isNewLine:
                     continue
 
-       #         result += ' '.join(list(str(line_count))) + ' ~ '
                 line_count += 1
                 isNewLine = True
                 directive = False
@@ -285,13 +292,6 @@ class C_Tokenizer(Tokenizer):
                 pass
 
             elif 'string' in type_:
-             #   matchObj = [m.group().strip()
-            #                for m in re.finditer(regex, value)]
-           #     if matchObj and keep_format_specifiers:
-          #          for each in matchObj:
-         #               result += each + ' '
-        #        else:
-       #             result += '_<string>_' + ' '
                 isNewLine = False
                 token_seq.append(("string", "-")) #TODO format string
 
@@ -301,40 +301,206 @@ class C_Tokenizer(Tokenizer):
                 prev_name = value
 
             elif type_ == 'number':
-        #        if keep_literals:
-       #             result += '_<number>_' + self._escape(value) + '# '
-      #          else:
-     #               result += '_<number>_' + '# '
                 isNewLine = False
                 token_seq.append(("number", "-"))
 
             elif 'char' in type_ or value == '':
-         #       result += '_<' + type_.lower() + '>_' + ' '
                 token_seq.append((type_, "-"))
                 isNewLine = False
             elif type_ == 'directive':
-        #        result += '_<' + type_ + '>_'
                 token_seq.append(("directive", "-"))
                 isNewLine = False
                 directive = True
 
             else:
                 converted_value = self._escape(value).replace('~', 'TiLddE')
-    #            result += '_<' + type_ + '>_' + converted_value + ' '
                 token_seq.append((type_, converted_value))
                 isNewLine = False
-
-  #      result = result[:-1]
-   #     names = names[:-1]
-
-    #    if result.endswith('~'):
-    #        idx = result.rfind('}')
-    #        result = result[:idx + 1]
-
         return token_seq
 
 
+    def tokenize_function(self, code, function_name ,keep_format_specifiers=False, keep_names=False,
+                 keep_literals=False, custom_names = []):
+        line_count = 1
+        name_sequence = []
+        if(custom_names == []): name_sequence = self._calls
+        else : name_sequence = custom_names
+        regex = '%(d|i|f|c|s|u|g|G|e|p|llu|ll|ld|l|o|x|X)'
+        isNewLine = True
+        # Get the iterable
+        my_gen = self._tokenize_code(code)
+        prev_id = True
+        prev_name = ""
+        directive = False;
+        prevTok = []
+        real_tok = []
+        false_tok = []
+        token_seq = false_tok
+        line_tok =  []
+        curly_brakets = 0; 
+        func_found = False
+        change = False
+        definition = False
+        token_lookahead = []
+        stop = False
+    #    print(function_name)
+        while True:
+            if token_lookahead != []:
+                token = token_lookahead.pop(0)
+            else:
+                if stop == False:
+                    try:
+                        token = next(my_gen)
+                    except StopIteration:
+                        token_seq += line_tok
+                        break
+                else:
+                    token_seq += line_tok
+                    break
+                    
+            if isinstance(token, Exception):
+                return token
+          #  print(token)
+            type_ = str(token[0])
+            value = str(token[1])
+            if(prev_id == True):
+                if(type_ == 'op'  and value == '(' and directive == False):
+   #                 print("----")
+                 #  print(prevTok)
+                    for tok in reversed(prevTok[:-1]):
+  #                      print(tok)
+                        if str(tok[0]) == 'whitespace' and (('\n' in str(tok[1]))  or ('\r' in str(tok[1]))):
+                            definition = False
+                            break
 
+                        elif str(tok[0]) == 'whitespace': continue
+                        elif str(tok[0]) == 'name' and str(tok[1]) != 'return' and str(tok[1]) != 'else' :
+                            definition = True
+                            break
+                        elif str(tok[0]) == 'op':
+                            if tok[1] != '*':
+                                definition = False
+                                break
+                            else: continue
+                        elif str(tok[0]) == 'name' and str(tok[1]) == 'return':
+                            definition = False
+                            break
+                    if(definition == True):
+                #        print("def found " + prev_name)
+                        while True:
+                            try:
+                                token_fut = next(my_gen)
+                            except StopIteration:
+                                stop = True
+                                break
+                            token_lookahead.append(token_fut)
+                      #      print(token_fut)
+                            if isinstance(token_fut, Exception):
+                                break
+
+                            if str(token_fut[0]) == 'op' and str(token_fut[1]) == '{':
+                                line_tok.append(("FuncDef", prev_name))
+                                prevTok.clear()
+                                if prev_name == function_name:
+                                   # print(function_name)
+                                    token_seq = real_tok;
+                                    func_found = True
+                                break
+                            if str(token_fut[0]) == 'op' and str(token_fut[1]) == ';':
+                                line_tok.append(("id", "func"))
+                                prevTok.clear()
+                                break
+                            
+                    elif(keep_names == True):
+                        #define calls and function style macros call
+                        line_tok.append(("id", prev_name))
+                   #     prevTok.clear()
+                    else:
+                        #define calls and function style macros call
+                        line_tok.append(("id", "func"))
+                 #       prevTok.clear()
+                elif type_ != 'whitespace':
+                    #define vars and macro definitions
+                    line_tok.append(("id", "var"))
+              #      prevTok.clear()
+
+            if type_ != 'whitespace' or  (type_ == 'whitespace'  and ('\n' in str(token[1]))  or ('\r' in str(token[1]))) and type_ != 'comment':
+                prev_id = False
+                prev_name = ""
+                prevTok.append(token)
+            if type_ == 'op' and func_found:
+                if value == '{': 
+                    curly_brakets +=1
+                if value == '}':
+                    curly_brakets -=1
+                    if curly_brakets == 0:
+                        func_found = False
+                        change = True
+                        #Wait until newline
+            
+            if value in self._keywords:
+                line_tok.append(("keyword", self._escape(value)))
+                isNewLine = False
+
+            elif type_ == 'include':
+                line_tok.append(("include", self._escape(value).lstrip()))
+                isNewLine = False
+
+            elif value in name_sequence:
+                line_tok.append(("APICall", self._escape(value).lstrip()))
+                isNewLine = False
+
+            elif value in self._types:
+                line_tok.append(("type", self._escape(value).lstrip()))
+                isNewLine = False
+
+            elif type_ == 'whitespace' and (('\n' in value) or ('\r' in value)):
+                if isNewLine:
+                    continue
+                line_count += 1
+                isNewLine = True
+                directive = False
+                line_tok.append(("endline", "-"))
+                token_seq += line_tok
+                line_tok.clear()
+        #        prevTok.clear()
+    #            del prevTok[0:-2]
+                if change == True:
+                    token_seq = false_tok
+                    change = False
+
+            elif type_ == 'whitespace' or type_ == 'comment' or type_ == 'nl':
+                pass
+
+            elif 'string' in type_:
+                isNewLine = False
+                line_tok.append(("string", "-")) #TODO format string
+                
+            elif type_ == 'name':
+                isNewLine = False
+                prev_id = True
+                prev_name = value
+
+            elif type_ == 'number':
+                isNewLine = False
+                line_tok.append(("number", "-"))
+
+            elif 'char' in type_ or value == '':
+                line_tok.append((type_, "-"))
+                isNewLine = False
+            elif type_ == 'directive':
+                line_tok.append(("directive", "-"))
+                isNewLine = False
+                directive = True
+
+            else:
+                converted_value = self._escape(value).replace('~', 'TiLddE')
+                line_tok.append((type_, converted_value))
+                isNewLine = False
+
+        return real_tok
+    
+        
     def tokenize_tostring(self, code, keep_format_specifiers=False, keep_names=False,
                  keep_literals=False, custom_names = []):
         result = '0 ~ '

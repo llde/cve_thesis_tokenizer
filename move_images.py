@@ -23,8 +23,8 @@ if __name__ == "__main__":
             combined_post = os.path.join(path_post, folder.path[position_last_slash +1:])
             val = assoc[folder.path[position_last_slash +1:]]
             if(val.startswith("\"CWE") == False):
-    #            print(val)
-    #            print("Wrong CWE")
+     #           print(val)
+     #           print("Wrong CWE")
                 continue
             path_tokpre = os.path.join(folder.path, "tokpre");
             path_tokpost = os.path.join(folder.path, "tokpost");
@@ -35,14 +35,15 @@ if __name__ == "__main__":
                 if doOnce == 0: os.makedirs(combined_pre,exist_ok=True)
                 doOnce = 1
                 shutil.copy(file.path, os.path.join(combined_pre, file.name ))
-            doOnce = 0
-            for file in os.scandir(path_tokpost):
-                print(file.path)
-                if(file.path.endswith(".jpg") == False): continue
-                if doOnce == 0: os.makedirs(combined_post,exist_ok=True)
-                doOnce = 1
-                shutil.copy(file.path, os.path.join(combined_post, file.name ))
                 save[folder.path[position_last_slash +1:]] = val
+
+#            doOnce = 0
+ #           for file in os.scandir(path_tokpost):
+  #              print(file.path)
+   #             if(file.path.endswith(".jpg") == False): continue
+    #            if doOnce == 0: os.makedirs(combined_post,exist_ok=True)
+     #           doOnce = 1
+      #          shutil.copy(file.path, os.path.join(combined_post, file.name ))
 
         with open('/home/lorenzo/toDriveTesi/attributes.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile, dialect='excel')

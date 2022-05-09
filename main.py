@@ -3,6 +3,8 @@ import tokenizer
 import json
 import regex
 import math
+import csv
+
 from PIL import Image
 
 path = "/home/lorenzo/outDB"
@@ -115,48 +117,69 @@ if __name__ == "__main__":
 
     normalized.sort(reverse = True, key = sort)
     print(len(normalized))
-
-    number = 200
+    token_func = dict();
+    with open('/home/lorenzo/outDB/attributes.csv', 'r', newline='') as csvfile:
+         reader = csv.reader(csvfile, dialect='excel')
+         for row in reader:
+             token_func[row[0]] = row[2]
+ 
+    number = 400
+    old_tokens = []
     for folder in os.scandir(path):
         if(folder.is_dir() == False): continue;
+        print(folder.name);
         if number == 0: break
+      #  folder = "/home/lorenzo/outDB/CVE-2012-6696/"
         path_pre = os.path.join(folder.path, "pre");
         path_post = os.path.join(folder.path, "post");
         path_tokpre = os.path.join(folder.path, "tokpre");
         path_tokpost = os.path.join(folder.path, "tokpost");
         os.makedirs(path_tokpre,exist_ok=True)
         os.makedirs(path_tokpost,exist_ok=True)
-        idx = 4
         cache.clear()
         for file in os.scandir(path_pre):
             with open(file.path,'r') as f:
                 content = f.read()
-            tok_code = tokenizer.tokenize(content, custom_names=normalized)
-            path_new = file.path.replace("/pre/", "/tokpre/")
-            lenght = len(tok_code)
-            size = math.ceil(math.sqrt(lenght))
-            print(lenght)
-            if(lenght == 0):  continue
-            img  = Image.new( mode = "L", size = (size,size) )
-            imp = img.load()
-            currIndex = 0
-            for i in range(0,size):
-                for j in range(0,size):
-                    if(currIndex >= lenght -1): break
-                    try:
-                        tok = tok_code[currIndex]
-                    except:
-                        print("Error index " + str(currIndex) + ", lenght" + str(lenght))
-                        break
-                    ret = token_to_pixel(tok)
-                    if(ret == -1): print("No enough value available")
-                    currIndex+=1;
-                    if(ret == -2):
-                        continue
-                    imp[j,i] = ret
+            tok_code = tokenizer.tokenize_function(content, token_func[folder.name]  ,custom_names=normalized)
+            if isinstance(tok_code, Exception): continue
+         #   print(tok_code)
+            old_tokens.append((file.path, token_func[folder.name] ,tok_code))
+    number -=1
 
-            img.save(path_new + ".jpg")
-            print(path_new)
+    max_size = 0
+    for _, _, tok in old_tokens:
+        lent = len(tok)
+        if(lent > max_size): max_size = lent
+    sizem = math.ceil(math.sqrt(max_size))
+    for path, _ , tok_code in old_tokens:
+        path_new = path.replace("/pre/", "/tokpre/")
+        print(path)
+        lenght = len(tok_code)
+        if(lenght == 0):
+            print("boh: " + path)
+            continue
+        img  = Image.new( mode = "L", size = (sizem,sizem) )
+        imp = img.load()
+        currIndex = 0
+        for i in range(0,sizem):
+            for j in range(0,sizem):
+                if(currIndex >= lenght -1):
+                    imp[j,i] = 0
+                    continue
+                try:
+                    tok = tok_code[currIndex]
+                except:
+                    print("Error index " + str(currIndex) + ", lenght" + str(lenght))
+                    break
+                ret = token_to_pixel(tok)
+                if(ret == -1): print("No enough value available")
+                currIndex+=1;
+                if(ret == -2):
+                    continue
+                imp[j,i] = ret
+
+        img.save(path_new + ".jpg")
+    '''
         for file in os.scandir(path_post):
             with open(file.path,'r') as f:
                 content = f.read()
@@ -185,5 +208,4 @@ if __name__ == "__main__":
 
             img.save(path_new + ".jpg")
             print(path_new)
-
-        number -=1
+    '''
