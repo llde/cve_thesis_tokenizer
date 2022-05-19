@@ -136,64 +136,54 @@ if __name__ == "__main__":
         path_tokpost = os.path.join(folder.path, "tokpost");
         os.makedirs(path_tokpre,exist_ok=True)
         os.makedirs(path_tokpost,exist_ok=True)
-        cache.clear()
+     #   cache.clear()
         for file in os.scandir(path_pre):
             with open(file.path,'r') as f:
                 content = f.read()
             tok_code = tokenizer.tokenize_function(content, token_func[folder.name]  ,custom_names=normalized)
             if isinstance(tok_code, Exception): continue
          #   print(tok_code)
-            old_tokens.append((file.path, token_func[folder.name] ,tok_code))
-    number -=1
-
-    max_size = 0
-    for _, _, tok in old_tokens:
-        lent = len(tok)
-        if(lent > max_size): max_size = lent
-    sizem = math.ceil(math.sqrt(max_size))
-    for path, _ , tok_code in old_tokens:
-        path_new = path.replace("/pre/", "/tokpre/")
-        print(path)
-        lenght = len(tok_code)
-        if(lenght == 0):
-            print("boh: " + path)
-            continue
-        img  = Image.new( mode = "L", size = (sizem,sizem) )
-        imp = img.load()
-        currIndex = 0
-        for i in range(0,sizem):
-            for j in range(0,sizem):
-                if(currIndex >= lenght -1):
-                    imp[j,i] = 0
-                    continue
-                try:
-                    tok = tok_code[currIndex]
-                except:
-                    print("Error index " + str(currIndex) + ", lenght" + str(lenght))
-                    break
-                ret = token_to_pixel(tok)
-                if(ret == -1): print("No enough value available")
-                currIndex+=1;
-                if(ret == -2):
-                    continue
-                imp[j,i] = ret
-
-        img.save(path_new + ".jpg")
-    '''
+            old_tokens.append((file.path,folder.name, True,tok_code))
         for file in os.scandir(path_post):
             with open(file.path,'r') as f:
                 content = f.read()
-            tok_code = tokenizer.tokenize(content, custom_names=normalized)
-            path_new = file.path.replace("/post/", "/tokpost/")
+            tok_code = tokenizer.tokenize_function(content, token_func[folder.name]  ,custom_names=normalized)
+            if isinstance(tok_code, Exception): continue
+         #   print(tok_code)
+            old_tokens.append((file.path, folder.name , False ,tok_code))
+
+    number -=1
+
+    max_size = 0
+    for _, _, _ , tok in old_tokens:
+        lent = len(tok)
+        if(lent > max_size): max_size = lent
+    sizem = math.ceil(math.sqrt(max_size))
+    with open('/home/lorenzo/outDB/classifier.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile, dialect='excel')
+ 
+        for path, name, vuln , tok_code in old_tokens:
             lenght = len(tok_code)
-            size = math.ceil(math.sqrt(lenght))
-            print(lenght)
-            img  = Image.new( mode = "L", size = (size,size) )
+            if(lenght == 0):
+                print("boh: " + path)
+                continue
+
+            if vuln:
+                path_new = path.replace("/pre/", "/tokpre/")
+                writer.writerow(["pre/" + name, True])
+            else:
+                path_new = path.replace("/post/", "/tokpost/")
+                writer.writerow(["post/" + name, False])
+
+            print(path)
+            img  = Image.new( mode = "L", size = (sizem,sizem) )
             imp = img.load()
             currIndex = 0
-            for i in range(0,size):
-                for j in range(0,size):
-                    if(currIndex >= lenght -1): break
+            for i in range(0,sizem):
+                for j in range(0,sizem):
+                    if(currIndex >= lenght -1):
+                        imp[j,i] = 0
+                        continue
                     try:
                         tok = tok_code[currIndex]
                     except:
@@ -207,5 +197,4 @@ if __name__ == "__main__":
                     imp[j,i] = ret
 
             img.save(path_new + ".jpg")
-            print(path_new)
-    '''
+
