@@ -4,7 +4,7 @@ import json
 import regex
 import math
 import csv
-
+import matplotlib.pyplot as plt
 from PIL import Image
 
 path = "/home/lorenzo/outDB"
@@ -143,6 +143,7 @@ if __name__ == "__main__":
             tok_code = tokenizer.tokenize_function(content, token_func[folder.name]  ,custom_names=normalized)
             if isinstance(tok_code, Exception): continue
          #   print(tok_code)
+            if len(tok_code) > 10000: continue
             old_tokens.append((file.path,folder.name, True,tok_code))
         for file in os.scandir(path_post):
             with open(file.path,'r') as f:
@@ -150,15 +151,30 @@ if __name__ == "__main__":
             tok_code = tokenizer.tokenize_function(content, token_func[folder.name]  ,custom_names=normalized)
             if isinstance(tok_code, Exception): continue
          #   print(tok_code)
+            if len(tok_code) > 10000: continue
             old_tokens.append((file.path, folder.name , False ,tok_code))
 
     number -=1
 
+    plot_x = []
+    plot_y = []
     max_size = 0
-    for _, _, _ , tok in old_tokens:
+    for _, _, _, tok in old_tokens:
         lent = len(tok)
         if(lent > max_size): max_size = lent
+        if len(plot_y) > lent:
+            plot_y[lent] += 1
+        else:
+            while len(plot_y) < lent:
+                plot_y.append(0)
+            plot_y.append(1)
+    for n in range(0, max_size +1):
+        plot_x.append(n)
     sizem = math.ceil(math.sqrt(max_size))
+    plot_x.sort()
+
+    plt.plot(plot_x,plot_y)
+    
     with open('/home/lorenzo/outDB/classifier.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile, dialect='excel')
  
@@ -198,3 +214,4 @@ if __name__ == "__main__":
 
             img.save(path_new + ".jpg")
 
+    plt.show()
